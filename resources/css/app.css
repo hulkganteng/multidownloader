@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        color-scheme: light;
+        scroll-behavior: smooth;
+    }
+
+    body {
+        font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+        text-rendering: optimizeLegibility;
+    }
+}
+
+@layer components {
+    .gradient-text {
+        @apply bg-gradient-to-r from-electric-600 to-electric-400 bg-clip-text text-transparent;
+    }
+
+    .soft-bg {
+        @apply bg-gradient-to-b from-sky-50 via-white to-white;
+    }
+
+    .card-surface {
+        @apply rounded-2xl border border-slate-200/80 bg-white shadow-card;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}
