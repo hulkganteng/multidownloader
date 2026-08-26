@@ -30,10 +30,31 @@ class DownloadFlowTest extends TestCase
         ]);
 
         $response->assertStatus(200)->assertJson(['status' => 'queued']);
-        $task = DownloadTask::sole();
+        $uuid = $response->json('uuid');
+        $task = DownloadTask::find($uuid);
+        $this->assertNotNull($task);
         $this->assertNull($task->quality);
         $this->assertNull($task->bitrate);
-        Queue::assertPushed(ProcessDownloadJob::class, fn ($job) => $job->task->is($task));
+        Queue::assertPushed(ProcessDownloadJob::class, fn ($job) => $job->task->uuid === $task->uuid);
+    }
+
+    public function test_download_api_accepts_tiktok_or_instagram_mp3_format(): void
+    {
+        Queue::fake();
+
+        $response = $this->postJson('/api/download', [
+            'url' => 'https://www.tiktok.com/@test/video/1234567890',
+            'format' => 'mp3',
+            'bitrate' => '320k',
+        ]);
+
+        $response->assertStatus(200)->assertJson(['status' => 'queued']);
+        $uuid = $response->json('uuid');
+        $task = DownloadTask::find($uuid);
+        $this->assertNotNull($task);
+        $this->assertSame('tiktok', $task->platform);
+        $this->assertSame('mp3', $task->format);
+        $this->assertSame('320k', $task->bitrate);
     }
 
     public function test_download_api_rejects_non_http_urls_without_creating_task(): void
@@ -45,7 +66,6 @@ class DownloadFlowTest extends TestCase
             'format' => 'mp4',
         ])->assertStatus(422);
 
-        $this->assertDatabaseCount('download_tasks', 0);
         Queue::assertNothingPushed();
     }
 
@@ -118,6 +138,6 @@ class DownloadFlowTest extends TestCase
         $this->artisan('downloads:cleanup')->assertSuccessful();
 
         $this->assertDirectoryDoesNotExist($directory);
-        $this->assertDatabaseCount('download_tasks', 0);
+        $this->assertNull(DownloadTask::find($uuid));
     }
 }

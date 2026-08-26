@@ -160,6 +160,22 @@
             e.copyLabel.textContent = statusMessages.copied;
             e.copyLinkButton.classList.remove('bg-emerald-50', 'text-emerald-700');
             e.actionsSuccess.classList.remove('hidden');
+
+            // Save to browser LocalStorage (no database required)
+            try {
+                const history = JSON.parse(localStorage.getItem('downloadin.history') || '[]');
+                const item = {
+                    uuid: data.uuid,
+                    title: data.title || e.title.textContent,
+                    filename: data.filename,
+                    download_url: data.download_url,
+                    size_bytes: data.size_bytes,
+                    timestamp: new Date().toISOString(),
+                };
+                const filtered = history.filter((h) => h.uuid !== data.uuid);
+                filtered.unshift(item);
+                localStorage.setItem('downloadin.history', JSON.stringify(filtered.slice(0, 30)));
+            } catch (err) { /* localStorage quota/disabled */ }
         }
 
         function showError(message, e) {

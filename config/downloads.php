@@ -6,6 +6,7 @@ return [
     'process_timeout' => env('DOWNLOAD_PROCESS_TIMEOUT', 1800),
     'storage_path' => 'downloads', // inside storage/app/
     'yt_dlp_python_path' => env('YT_DLP_PYTHON_PATH'),
+    'yt_dlp_cookies_path' => env('YT_DLP_COOKIES_PATH'),
     'ffmpeg_path' => env('FFMPEG_PATH'),
 
     'youtube' => [
@@ -16,6 +17,21 @@ return [
     'tiktok' => [
         'enabled' => true,
         'bin_path' => env('TIKTOK_DL_PATH', env('YOUTUBE_DL_PATH', 'yt-dlp')),
+    ],
+
+    'instagram' => [
+        'enabled' => true,
+        'bin_path' => env('INSTAGRAM_DL_PATH', env('YOUTUBE_DL_PATH', 'yt-dlp')),
+    ],
+
+    'facebook' => [
+        'enabled' => true,
+        'bin_path' => env('FACEBOOK_DL_PATH', env('YOUTUBE_DL_PATH', 'yt-dlp')),
+    ],
+
+    'twitter' => [
+        'enabled' => true,
+        'bin_path' => env('TWITTER_DL_PATH', env('YOUTUBE_DL_PATH', 'yt-dlp')),
     ],
 
     'direct' => [

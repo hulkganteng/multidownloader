@@ -16,6 +16,12 @@ class DirectMediaDownloader implements DownloaderInterface
     public function analyze(string $url): array
     {
         $metadata = $this->transfer($url, null, true);
+        $contentType = strtolower($metadata['content_type'] ?? '');
+
+        if (str_starts_with($contentType, 'text/html')) {
+            throw new RuntimeException('The provided link points to a web page, not a downloadable media file.');
+        }
+
         $path = parse_url($metadata['url'], PHP_URL_PATH) ?: '';
         $filename = basename(rawurldecode($path)) ?: 'media-file';
 
@@ -42,7 +48,7 @@ class DirectMediaDownloader implements DownloaderInterface
         $outputPath = $outputDirectory.DIRECTORY_SEPARATOR.$safeName.'.'.$extension;
 
         try {
-            $this->transfer($task->source_url, $outputPath, false);
+            $this->transfer($task->source_url, $outputPath, false, $task);
 
             return $outputPath;
         } catch (Throwable $e) {
@@ -56,11 +62,13 @@ class DirectMediaDownloader implements DownloaderInterface
      *
      * @return array{url: string, content_type: ?string, content_length: ?int}
      */
-    private function transfer(string $url, ?string $destination, bool $headOnly): array
+    private function transfer(string $url, ?string $destination, bool $headOnly, ?DownloadTask $task = null): array
     {
         $maxRedirects = 3;
         $maxBytes = (int) config('downloads.max_bytes', 250 * 1024 * 1024);
         $currentUrl = $url;
+        $lastProgress = 10;
+        $lastUpdateTime = microtime(true);
 
         for ($redirect = 0; $redirect <= $maxRedirects; $redirect++) {
             $target = $this->validatedTarget($currentUrl);
@@ -94,14 +102,29 @@ class DirectMediaDownloader implements DownloaderInterface
                     CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
                     CURLOPT_SSL_VERIFYPEER => true,
                     CURLOPT_SSL_VERIFYHOST => 2,
-                    CURLOPT_USERAGENT => 'Downloa din/1.0',
+                    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                     CURLOPT_RESOLVE => ["{$target['host']}:{$target['port']}:{$resolvedIp}"],
+                    CURLOPT_BUFFERSIZE => 128 * 1024,
+                    CURLOPT_TCP_NODELAY => 1,
+                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
                     CURLOPT_NOPROGRESS => false,
-                    CURLOPT_XFERINFOFUNCTION => function ($resource, $downloadTotal, $downloaded) use ($maxBytes, &$tooLarge): int {
+                    CURLOPT_XFERINFOFUNCTION => function ($resource, $downloadTotal, $downloaded) use ($maxBytes, &$tooLarge, $task, &$lastProgress, &$lastUpdateTime): int {
                         if ($downloadTotal > $maxBytes || $downloaded > $maxBytes) {
                             $tooLarge = true;
 
                             return 1;
+                        }
+
+                        if ($task !== null && $downloadTotal > 0) {
+                            $pct = ($downloaded / $downloadTotal) * 100;
+                            $mapped = (int) (10 + ($pct * 0.8));
+                            $now = microtime(true);
+
+                            if (($mapped - $lastProgress >= 5 || ($now - $lastUpdateTime) >= 2.0) && $mapped < 95) {
+                                $lastProgress = $mapped;
+                                $lastUpdateTime = $now;
+                                $task->update(['progress' => $mapped]);
+                            }
                         }
 
                         return 0;

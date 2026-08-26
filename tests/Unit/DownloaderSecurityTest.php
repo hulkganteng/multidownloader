@@ -22,6 +22,9 @@ class DownloaderSecurityTest extends TestCase
         $detector = new PlatformDetector;
 
         $this->assertSame('direct', $detector->detect('https://not-tiktok.com/video'));
-        $this->assertSame('tiktok', $detector->detect('https://www.tiktok.com/video/123'));
+        $this->assertSame('tiktok', $detector->detect('https://www.tiktok.com/@user/video/123'));
+        $this->assertSame('instagram', $detector->detect('https://www.instagram.com/reel/Cx12345/'));
+        $this->assertSame('facebook', $detector->detect('https://www.facebook.com/watch/?v=123456'));
+        $this->assertSame('twitter', $detector->detect('https://x.com/user/status/123456789'));
     }
 }

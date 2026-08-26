@@ -15,17 +15,13 @@ class CleanupDownloads extends Command
 
     public function handle()
     {
-        $expiredTasks = DownloadTask::expired()->get();
-        $downloadRoot = storage_path('app/'.config('downloads.storage_path', 'downloads'));
+        $expiredTasks = DownloadTask::expired();
+        $count = count($expiredTasks);
 
         foreach ($expiredTasks as $task) {
-            if (Str::isUuid($task->uuid)) {
-                File::deleteDirectory($downloadRoot.DIRECTORY_SEPARATOR.$task->uuid);
-            }
-
             $task->delete();
         }
 
-        $this->info('Cleaned up '.$expiredTasks->count().' expired downloads.');
+        $this->info("Cleaned up {$count} expired downloads.");
     }
 }

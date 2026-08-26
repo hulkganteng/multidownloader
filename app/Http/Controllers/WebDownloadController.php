@@ -75,7 +75,9 @@ class WebDownloadController extends Controller
             return redirect()->route('home')->withInput()->withErrors(['url' => $message]);
         }
 
-        $allowedFormats = $platform === 'youtube' ? ['mp3', 'mp4'] : ['original'];
+        $allowedFormats = in_array($platform, ['youtube', 'tiktok', 'instagram', 'facebook', 'twitter'], true)
+            ? ['mp3', 'mp4', 'original']
+            : ['original'];
         if (! in_array($data['format'], $allowedFormats, true)) {
             $message = 'The selected format is not available for this platform.';
             if ($request->wantsJson()) {
@@ -98,6 +100,7 @@ class WebDownloadController extends Controller
         ]);
 
         ProcessDownloadJob::dispatch($task);
+        \App\Services\QueueRunner::trigger();
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -118,24 +121,34 @@ class WebDownloadController extends Controller
 
     private function friendlyErrorMessage(\Throwable $e): string
     {
-        $message = mb_strtolower($e->getMessage());
+        $raw = $e->getMessage();
+        $message = mb_strtolower($raw);
+
         $patterns = [
             'disabled' => 'This downloader is temporarily disabled. Please try again later.',
-            'private' => 'This media is private and cannot be accessed.',
+            'sign in to confirm' => 'This content is age-restricted or protected by a bot check.',
+            'login required' => 'This content requires authentication to view or download.',
+            'is a private video' => 'This media is private and cannot be accessed.',
+            'this video is private' => 'This media is private and cannot be accessed.',
+            'private account' => 'This account is private and its media cannot be accessed.',
+            'account is private' => 'This account is private and its media cannot be accessed.',
+            'only followers' => 'This content is private and only available to approved followers.',
             'not available in your country' => 'This media is not available in your region.',
             "isn't available in your country" => 'This media is not available in your region.',
             'georestricted' => 'This media is geographically restricted.',
             'geo-restricted' => 'This media is geographically restricted.',
             'video unavailable' => 'This video is unavailable or has been removed.',
-            'sign in to confirm' => 'This content is age-restricted or protected by a bot check.',
+            'this video has been removed' => 'This video has been removed.',
+            'post has been removed' => 'This post has been removed.',
             'copyright' => 'This content has been removed due to copyright.',
             'maximum allowed size' => 'This file is too large to download.',
             'too large' => 'This file is too large to download.',
             'returned http 404' => 'The requested file was not found on the source.',
-            'returned http 403' => 'The source blocked this request. The media may be protected.',
+            'returned http 403' => 'The source blocked this request. The media may be protected or restricted.',
             'redirected too many times' => 'The media URL redirected too many times.',
-            'could not be resolved' => 'The media host could not be resolved.',
-            'could not be read' => 'The media could not be read. It may be private, restricted, or unavailable.',
+            'could not be resolved' => 'The media host could not be resolved. Please check the link.',
+            'points to a web page' => 'The provided link points to a web page, not a direct media file.',
+            'reserved networks' => 'Downloads from local or private networks are not allowed.',
         ];
 
         foreach ($patterns as $needle => $friendly) {
@@ -144,6 +157,11 @@ class WebDownloadController extends Controller
             }
         }
 
-        return 'We could not analyze that link. Check that it is public and try again.';
+        // If the exception was a clean custom RuntimeException message without stack traces or path strings
+        if ($e instanceof \RuntimeException && ! str_contains($raw, '\\') && ! str_contains($raw, '/') && strlen($raw) < 180) {
+            return $raw;
+        }
+
+        return 'Could not analyze this link. Please ensure it is publicly accessible and try again.';
     }
 }

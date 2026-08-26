@@ -1,66 +1,145 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🚀 DownloadIn — Modern Multi-Platform Media Downloader
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi pengunduh video dan audio berbasis **Laravel 11** yang cepat, andal, dan modern. Mendukung berbagai platform populer seperti **YouTube, TikTok, Instagram, Facebook, Twitter/X**, serta **Direct Media Links** dengan arsitektur **Zero-Database (100% File Storage & Browser LocalStorage)**.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## ✨ Fitur Utama
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- 🎯 **Multi-Platform Support**: YouTube, TikTok (tanpa watermark), Instagram Reels/Video, Facebook Watch, Twitter/X, dan link file langsung.
+- 🎵 **Pilihan Format Lengkap**: Unduh sebagai video **MP4** (resolusi 360p s.d. 4K) atau ekstrak audio ke **MP3** (128k, 192k, 320k).
+- ⚡ **Super Cepat (Multi-Thread Concurrent Download)**: Mengunduh fragmen video secara paralel (`--concurrent-fragments 4`) untuk memaksimalkan kecepatan transfer.
+- 🗄️ **Zero-Database (Bebas Database SQL)**:
+  - Metadata tugas unduhan disimpan dalam file JSON di `storage/app/downloads/{uuid}/task.json`.
+  - Riwayat unduhan & preferensi format disimpan di **LocalStorage browser**.
+  - Tidak memerlukan instalasi MySQL/PostgreSQL atau migrasi database (`php artisan migrate`).
+- 📊 **Real-Time Progress Bar**: Menampilkan persentase unduhan aktual secara live di antarmuka web.
+- 🛡️ **Anti-Bot & Reverse Proxy Ready**: Dilengkapi extractor modern, browser User-Agent, dan siap berjalan di balik **Cloudflare Tunnel / HTTPS Reverse Proxy**.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## 📋 Persyaratan Sistem (Prerequisites)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **PHP**: Versi 8.2 atau lebih baru (dengan ekstensi `curl`, `mbstring`, `fileinfo`, `json`, `openssl`).
+- **Composer**: Dependency manager PHP.
+- **Node.js & NPM**: Untuk build asset frontend (Tailwind CSS & Vite).
+- **Tools Binary**: `yt-dlp` dan `ffmpeg` (sudah tersedia untuk Windows di folder `tools/bin/`).
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+---
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## 🛠️ Panduan Instalasi Lokal (Quick Start)
 
-## Laravel Sponsors
+1. **Clone repository & masuk ke direktori proyek**:
+   ```bash
+   git clone <url-repository-anda>
+   cd multidownloader
+   ```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+2. **Install dependensi PHP & Node.js**:
+   ```bash
+   composer install
+   npm install
+   ```
 
-### Premium Partners
+3. **Salin file konfigurasi lingkungan (`.env`)**:
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+4. **Build asset tampilan frontend**:
+   ```bash
+   npm run build
+   ```
 
-## Contributing
+5. **Jalankan web server lokal**:
+   ```bash
+   php artisan serve
+   ```
+   Buka browser di `http://127.0.0.1:8000`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## 🌐 Panduan Hosting di Laptop Pribadi + Cloudflare Tunnel
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Anda bisa menjadikan laptop Anda sebagai server publik gratis agar website bisa diakses dari HP dan komputer lain di seluruh dunia melalui **Cloudflare Tunnel**.
 
-## Security Vulnerabilities
+### Langkah 1: Jalankan Server Laravel
+Buka Terminal / PowerShell di folder proyek:
+```bash
+php artisan serve --host=0.0.0.0 --port=8000
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Langkah 2: Jalankan Cloudflare Tunnel
 
-## License
+#### Opsi A: Quick Tunnel (Gratis & Instan Tanpa Domain)
+Jalankan perintah berikut di terminal terpisah:
+```bash
+cloudflared tunnel --url http://localhost:8000
+```
+Cloudflare akan menampilkan URL publik acak (contoh: `https://your-tunnel-name.trycloudflare.com`). URL ini sudah bisa langsung dibuka dari internet.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+#### Opsi B: Menggunakan Domain Pribadi (Rekomendasi)
+1. Buka dashboard [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks** → **Tunnels**.
+2. Buat tunnel baru dan tambahkan **Public Hostname**:
+   - **Service Type**: `HTTP`
+   - **URL**: `localhost:8000`
+3. Jalankan tunnel di laptop Anda:
+   ```bash
+   cloudflared tunnel run <nama-tunnel-anda>
+   ```
+4. Perbarui file `.env` di proyek:
+   ```env
+   APP_URL=https://downloadin.domainanda.com
+   ```
+
+### 💡 Tips Agar Laptop Optimal Sebagai Server:
+- **Pengaturan Daya (Power & Sleep)**: Atur Windows ke *"Never sleep when plugged in"* agar server tidak mati saat layar ditutup.
+- **Koneksi Jaringan**: Gunakan koneksi Wi-Fi yang stabil atau kabel LAN.
+
+---
+
+## 🐧 Panduan Deployment di Shared Hosting (cPanel) / VPS Linux
+
+Jika ingin memindahkan website ke Shared Hosting atau VPS Linux:
+
+1. **Pastikan fungsi PHP `proc_open` dan `exec` diaktifkan** pada menu *Select PHP Version* di cPanel.
+2. **Unduh binary Linux standalone** ke folder `tools/bin/`:
+   ```bash
+   # Unduh yt-dlp Linux standalone
+   curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o tools/bin/yt-dlp
+   chmod +x tools/bin/yt-dlp
+
+   # Pastikan ffmpeg Linux executable
+   chmod +x tools/bin/ffmpeg
+   ```
+3. **Sesuaikan file `.env`**:
+   ```env
+   YOUTUBE_DL_PATH=tools/bin/yt-dlp
+   TIKTOK_DL_PATH=tools/bin/yt-dlp
+   INSTAGRAM_DL_PATH=tools/bin/yt-dlp
+   FACEBOOK_DL_PATH=tools/bin/yt-dlp
+   TWITTER_DL_PATH=tools/bin/yt-dlp
+   FFMPEG_PATH=tools/bin/ffmpeg
+   ```
+
+---
+
+## 🧹 Pembersihan File Unduhan Otomatis (Cleanup)
+
+File media yang diunduh memiliki masa berlaku (default: 24 jam). Untuk membersihkan file yang kedaluwarsa dari penyimpanan:
+
+```bash
+php artisan downloads:cleanup
+```
+
+> **Tips di Hosting / Server**: Pasang cron job harian pada server:
+> ```bash
+> 0 2 * * * cd /path/to/multidownloader && php artisan downloads:cleanup >> /dev/null 2>&1
+> ```
+
+---
+
+## 📜 Lisensi & Kontribusi
+
+Proyek ini dibuat untuk keperluan personal & edukasi di bawah lisensi [MIT License](LICENSE).

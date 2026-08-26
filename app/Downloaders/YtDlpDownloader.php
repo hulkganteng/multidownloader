@@ -4,6 +4,7 @@ namespace App\Downloaders;
 
 use App\Downloaders\Contracts\DownloaderInterface;
 use App\Models\DownloadTask;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -18,40 +19,86 @@ abstract class YtDlpDownloader implements DownloaderInterface
     public function analyze(string $url): array
     {
         $this->ensureEnabled();
+        $cleanUrl = $this->cleanUrl($url);
+        $cacheKey = 'media_meta_'.sha1($cleanUrl);
 
-        try {
-            $process = $this->createProcess([
-                ...$this->baseCommand(),
-                '--dump-single-json',
-                '--skip-download',
-                '--no-playlist',
-                '--no-warnings',
-                '--',
-                $url,
-            ]);
-            $process->setTimeout(min(120, (int) config('downloads.process_timeout', 1800)));
-            $process->mustRun();
+        return Cache::remember($cacheKey, 900, function () use ($url, $cleanUrl) {
+            try {
+                $process = $this->createProcess([
+                    ...$this->baseCommand(),
+                    '--dump-single-json',
+                    '--skip-download',
+                    '--no-playlist',
+                    '--no-warnings',
+                    '--',
+                    $cleanUrl,
+                ]);
+                $process->setTimeout(min(120, (int) config('downloads.process_timeout', 1800)));
+                $process->mustRun();
 
-            $metadata = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
-        } catch (Throwable $e) {
-            Log::warning('Media analysis failed', [
+                $metadata = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            } catch (Throwable $e) {
+                Log::warning('Media analysis failed', [
+                    'platform' => $this->platform(),
+                    'url' => $url,
+                    'clean_url' => $cleanUrl,
+                    'process_error' => isset($process) ? $process->getErrorOutput() : null,
+                    'process_output' => isset($process) ? $process->getOutput() : null,
+                    'exception' => $e->getMessage(),
+                ]);
+
+                $detail = isset($process) ? $this->friendlyError($process) : null;
+
+                throw new RuntimeException($detail ?? 'Could not read media from this link. Please ensure it is public and accessible.');
+            }
+
+            return [
                 'platform' => $this->platform(),
-                'exception' => $e,
-            ]);
+                'title' => Str::limit((string) ($metadata['title'] ?? 'Untitled media'), 255, ''),
+                'thumbnail_url' => filter_var($metadata['thumbnail'] ?? null, FILTER_VALIDATE_URL) ?: null,
+                'duration_seconds' => max(0, (int) ($metadata['duration'] ?? 0)),
+                'size_bytes' => $this->estimateSize($metadata),
+                'formats' => $this->availableFormats($metadata),
+            ];
+        });
+    }
 
-            $detail = isset($process) ? $this->friendlyError($process) : null;
-
-            throw new RuntimeException($detail ?? 'The media could not be read. It may be private, restricted, or unavailable.');
+    private function cleanUrl(string $url): string
+    {
+        $parts = parse_url($url);
+        if (! isset($parts['host'])) {
+            return $url;
         }
 
-        return [
-            'platform' => $this->platform(),
-            'title' => Str::limit((string) ($metadata['title'] ?? 'Untitled media'), 255, ''),
-            'thumbnail_url' => filter_var($metadata['thumbnail'] ?? null, FILTER_VALIDATE_URL) ?: null,
-            'duration_seconds' => max(0, (int) ($metadata['duration'] ?? 0)),
-            'size_bytes' => $this->estimateSize($metadata),
-            'formats' => $this->availableFormats($metadata),
-        ];
+        $host = strtolower($parts['host']);
+
+        // Remove tracking params while preserving video identifiers
+        if (str_contains($host, 'youtube.com') && isset($parts['query'])) {
+            parse_str($parts['query'], $query);
+            $v = $query['v'] ?? null;
+            if ($v) {
+                return "https://www.youtube.com/watch?v={$v}";
+            }
+        }
+
+        if ($host === 'youtu.be') {
+            $path = trim($parts['path'] ?? '', '/');
+            if ($path !== '') {
+                return "https://youtu.be/{$path}";
+            }
+        }
+
+        if (str_contains($host, 'instagram.com') || str_contains($host, 'instagr.am')) {
+            $path = trim($parts['path'] ?? '', '/');
+            return "https://www.instagram.com/{$path}/";
+        }
+
+        if (str_contains($host, 'tiktok.com')) {
+            $path = trim($parts['path'] ?? '', '/');
+            return "https://www.tiktok.com/{$path}";
+        }
+
+        return $url;
     }
 
     public function download(DownloadTask $task): string
@@ -61,12 +108,16 @@ abstract class YtDlpDownloader implements DownloaderInterface
         $outputDirectory = storage_path('app/downloads/'.$task->uuid);
         File::ensureDirectoryExists($outputDirectory, 0755, true);
         $outputTemplate = $outputDirectory.DIRECTORY_SEPARATOR.'media.%(ext)s';
+        $cleanUrl = $this->cleanUrl($task->source_url);
 
         $arguments = [
             ...$this->baseCommand(),
             '--no-playlist',
-            '--no-progress',
             '--no-warnings',
+            '--newline',
+            '--no-mtime',
+            '--concurrent-fragments', '4',
+            '--buffer-size', '16M',
             '--max-filesize',
             (string) config('downloads.max_bytes'),
             '--print',
@@ -85,21 +136,45 @@ abstract class YtDlpDownloader implements DownloaderInterface
         } elseif ($task->format === 'mp4') {
             $quality = ctype_digit((string) $task->quality) ? (int) $task->quality : null;
             $selector = $quality
-                ? "bestvideo[height<={$quality}]+bestaudio/best[height<={$quality}]"
+                ? "bestvideo[height<={$quality}]+bestaudio/best[height<={$quality}]/best"
                 : 'bestvideo+bestaudio/best';
             array_push($arguments, '--format', $selector, '--merge-output-format', 'mp4');
         } else {
-            array_push($arguments, '--format', 'best');
+            array_push($arguments, '--format', 'bestvideo+bestaudio/best');
         }
 
-        array_push($arguments, '--output', $outputTemplate, '--', $task->source_url);
+        array_push($arguments, '--output', $outputTemplate, '--', $cleanUrl);
 
         try {
             $process = $this->createProcess($arguments);
             $process->setTimeout((int) config('downloads.process_timeout', 1800));
-            $process->mustRun();
 
-            $path = $this->findDownloadedFile($outputDirectory, $process->getOutput());
+            $lastProgress = 10;
+            $lastUpdateTime = microtime(true);
+            $processOutput = '';
+
+            $process->run(function ($type, $buffer) use ($task, &$lastProgress, &$lastUpdateTime, &$processOutput) {
+                $processOutput .= $buffer;
+
+                // Match yt-dlp progress: [download]  45.2%
+                if (preg_match('/\[download\]\s+(\d+(?:\.\d+)?)%/i', $buffer, $matches)) {
+                    $pct = (float) $matches[1];
+                    $mapped = (int) (10 + ($pct * 0.8)); // map 0-100% download into 10-90% overall
+                    $now = microtime(true);
+
+                    if (($mapped - $lastProgress >= 5 || ($now - $lastUpdateTime) >= 2.0) && $mapped < 95) {
+                        $lastProgress = $mapped;
+                        $lastUpdateTime = $now;
+                        $task->update(['progress' => $mapped]);
+                    }
+                }
+            });
+
+            if (! $process->isSuccessful()) {
+                throw new \Symfony\Component\Process\Exception\ProcessFailedException($process);
+            }
+
+            $path = $this->findDownloadedFile($outputDirectory, $processOutput);
             $maxBytes = (int) config('downloads.max_bytes');
 
             if (filesize($path) > $maxBytes) {
@@ -158,15 +233,24 @@ abstract class YtDlpDownloader implements DownloaderInterface
 
         $patterns = [
             'sign in to confirm' => 'This content is age-restricted or protected by a bot check.',
+            'login required' => 'This content requires authentication. The post may be private or restricted.',
             'private video' => 'This video is private and cannot be downloaded.',
-            'private' => 'This media is private and cannot be downloaded.',
+            'is a private video' => 'This video is private and cannot be downloaded.',
+            'this video is private' => 'This video is private and cannot be downloaded.',
+            'account is private' => 'This account is private and cannot be accessed.',
+            'private account' => 'This account is private and cannot be accessed.',
+            'only followers' => 'This content is private and only available to approved followers.',
             'not available in your country' => 'This media is not available in your region.',
             "isn't available in your country" => 'This media is not available in your region.',
             'georestricted' => 'This media is geographically restricted.',
             'geo-restricted' => 'This media is geographically restricted.',
             'video unavailable' => 'This video is unavailable or has been removed.',
+            'this video has been removed' => 'This video has been removed.',
+            'post has been removed' => 'This post has been removed.',
             'copyright' => 'This content has been removed due to copyright.',
             'this live event has ended' => 'This livestream has already ended.',
+            'unable to extract' => 'Could not extract media info from this link. The post may be restricted or unavailable.',
+            'rate-limit' => 'Too many requests. Please try again in a few moments.',
         ];
 
         foreach ($patterns as $needle => $friendly) {
@@ -180,10 +264,6 @@ abstract class YtDlpDownloader implements DownloaderInterface
 
     protected function availableFormats(array $metadata): array
     {
-        if ($this->platform() !== 'youtube') {
-            return ['original' => ['original']];
-        }
-
         $qualities = collect($metadata['formats'] ?? [])
             ->filter(fn (array $format) => ($format['vcodec'] ?? 'none') !== 'none' && ! empty($format['height']))
             ->pluck('height')
@@ -249,6 +329,28 @@ abstract class YtDlpDownloader implements DownloaderInterface
             $ffmpegPath = $this->resolveConfiguredPath($ffmpegPath);
             array_push($command, '--ffmpeg-location', $ffmpegPath);
         }
+
+        $cookiesPath = config('downloads.yt_dlp_cookies_path');
+        if (is_string($cookiesPath) && $cookiesPath !== '') {
+            $cookiesPath = $this->resolveConfiguredPath($cookiesPath);
+            if (file_exists($cookiesPath)) {
+                array_push($command, '--cookies', $cookiesPath);
+            }
+        }
+
+        // Anti-bot extractor arguments, browser user-agent & options
+        array_push(
+            $command,
+            '--no-check-certificates',
+            '--user-agent',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            '--add-header',
+            'Accept-Language:en-US,en;q=0.9',
+            '--add-header',
+            'Sec-Fetch-Mode:navigate',
+            '--extractor-args',
+            'youtube:player_client=android,web,ios'
+        );
 
         return $command;
     }

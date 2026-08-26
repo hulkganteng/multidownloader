@@ -18,8 +18,11 @@ Route::get('/dl/{uuid}', function (Request $request, $uuid) {
         abort(404, 'File not found on server.');
     }
 
-    return response()->download($path, $task->output_filename);
-})->name('download.file')->middleware('throttle:20,1');
+    return response()->download($path, $task->output_filename, [
+        'Accept-Ranges' => 'bytes',
+        'Content-Type' => $task->output_mime ?: 'application/octet-stream',
+    ]);
+})->name('download.file')->middleware('throttle:60,1');
 
 // Main Web Routes
 Route::get('/', [WebDownloadController::class, 'index'])->name('home');
