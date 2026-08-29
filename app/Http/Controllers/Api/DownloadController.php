@@ -98,7 +98,7 @@ class DownloadController extends Controller
 
         if ($taskModel->status === 'finished') {
             // Generate signed URL
-            $expiresAt = $taskModel->expires_at ?? now()->addHours(config('downloads.ttl_hours', 24));
+            $expiresAt = $taskModel->expires_at ?? now()->addHours(config('downloads.ttl_hours', 1));
             $response['download_url'] = URL::temporarySignedRoute('download.file', $expiresAt, ['uuid' => $taskModel->uuid]);
             $response['filename'] = $taskModel->output_filename;
             $response['size_bytes'] = $taskModel->output_size_bytes;

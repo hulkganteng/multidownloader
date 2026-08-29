@@ -127,15 +127,21 @@ Jika ingin memindahkan website ke Shared Hosting atau VPS Linux:
 
 ## 🧹 Pembersihan File Unduhan Otomatis (Cleanup)
 
-File media yang diunduh memiliki masa berlaku (default: 24 jam). Untuk membersihkan file yang kedaluwarsa dari penyimpanan:
+File media dihapus otomatis setelah selesai dikirim ke pengguna. File yang tidak pernah diambil memiliki masa berlaku satu jam dan diperiksa setiap 10 menit sebagai cleanup cadangan:
 
 ```bash
 php artisan downloads:cleanup
 ```
 
-> **Tips di Hosting / Server**: Pasang cron job harian pada server:
+Di laptop/server lokal, jalankan scheduler bersama aplikasi:
+
+```bash
+php artisan schedule:work
+```
+
+> **Tips di Hosting / Server**: Jalankan Laravel scheduler setiap menit melalui cron:
 > ```bash
-> 0 2 * * * cd /path/to/multidownloader && php artisan downloads:cleanup >> /dev/null 2>&1
+> * * * * * cd /path/to/multidownloader && php artisan schedule:run >> /dev/null 2>&1
 > ```
 
 ---

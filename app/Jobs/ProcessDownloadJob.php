@@ -46,7 +46,7 @@ class ProcessDownloadJob implements ShouldQueue
             'output_size_bytes' => filesize($filePath),
             'output_mime' => mime_content_type($filePath) ?: 'application/octet-stream',
             'finished_at' => now(),
-            'expires_at' => now()->addHours(config('downloads.ttl_hours', 24)),
+            'expires_at' => now()->addHours(config('downloads.ttl_hours', 1)),
         ]);
     }
 
@@ -70,7 +70,7 @@ class ProcessDownloadJob implements ShouldQueue
             'status' => 'failed',
             'error_message' => $message,
             'progress' => 0,
-            'expires_at' => now()->addHours(config('downloads.ttl_hours', 24)),
+            'expires_at' => now()->addHours(config('downloads.ttl_hours', 1)),
         ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\DownloadTask;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -86,6 +87,43 @@ class DownloadFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'finished')
             ->assertJsonStructure(['download_url']);
+    }
+
+    public function test_downloaded_file_is_deleted_after_it_is_sent(): void
+    {
+        $uuid = (string) Str::uuid();
+        $directory = storage_path('app/downloads/'.$uuid);
+        $path = $directory.'/video.mp4';
+        File::ensureDirectoryExists($directory);
+        File::put($path, 'temporary video');
+
+        DownloadTask::create([
+            'uuid' => $uuid,
+            'source_url' => 'https://example.com/video.mp4',
+            'platform' => 'direct',
+            'format' => 'original',
+            'title' => 'Video',
+            'status' => 'finished',
+            'progress' => 100,
+            'output_filename' => 'video.mp4',
+            'output_mime' => 'video/mp4',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $url = URL::temporarySignedRoute('download.file', now()->addHour(), ['uuid' => $uuid]);
+
+        $response = $this->get($url);
+        $response->assertOk()->assertDownload('video.mp4');
+
+        ob_start();
+        try {
+            $response->baseResponse->sendContent();
+        } finally {
+            ob_end_clean();
+        }
+
+        $this->assertFileDoesNotExist($path);
+        $this->assertFileExists(DownloadTask::metaPath($uuid));
     }
 
     public function test_status_page_builds_the_task_api_url_behind_an_https_tunnel(): void

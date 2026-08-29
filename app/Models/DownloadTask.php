@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Routing\UrlRoutable;
 use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Contracts\Support\Jsonable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
-class DownloadTask implements Arrayable, Jsonable
+class DownloadTask implements Arrayable, Jsonable, UrlRoutable
 {
     public string $uuid;
     public string $source_url = '';
@@ -214,5 +215,25 @@ class DownloadTask implements Arrayable, Jsonable
     public function toJson($options = 0): string
     {
         return json_encode($this->toArray(), $options);
+    }
+
+    public function getRouteKey(): mixed
+    {
+        return $this->uuid;
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        return static::find($value);
+    }
+
+    public function resolveChildRouteBinding($childType, $value, $field): ?self
+    {
+        return null;
     }
 }

@@ -21,7 +21,7 @@ Route::get('/dl/{uuid}', function (Request $request, $uuid) {
     return response()->download($path, $task->output_filename, [
         'Accept-Ranges' => 'bytes',
         'Content-Type' => $task->output_mime ?: 'application/octet-stream',
-    ]);
+    ])->deleteFileAfterSend(true);
 })->name('download.file')->middleware('throttle:60,1');
 
 // Main Web Routes

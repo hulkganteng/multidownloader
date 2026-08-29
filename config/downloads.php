@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'ttl_hours' => env('DOWNLOAD_TTL_HOURS', 24),
+    'ttl_hours' => env('DOWNLOAD_TTL_HOURS', 1),
     'max_bytes' => env('DOWNLOAD_MAX_BYTES', 250 * 1024 * 1024), // 250MB
     'process_timeout' => env('DOWNLOAD_PROCESS_TIMEOUT', 1800),
     'storage_path' => 'downloads', // inside storage/app/
