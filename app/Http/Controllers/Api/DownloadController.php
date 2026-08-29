@@ -7,6 +7,7 @@ use App\Jobs\ProcessDownloadJob;
 use App\Models\DownloadTask;
 use App\Services\DownloadService;
 use App\Services\PlatformDetector;
+use App\Services\QueueRunner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
@@ -75,7 +76,7 @@ class DownloadController extends Controller
         ]);
 
         ProcessDownloadJob::dispatch($task);
-        \App\Services\QueueRunner::trigger();
+        QueueRunner::trigger();
 
         return response()->json([
             'uuid' => $task->uuid,
@@ -98,7 +99,7 @@ class DownloadController extends Controller
 
         if ($taskModel->status === 'finished') {
             // Generate signed URL
-            $expiresAt = $taskModel->expires_at ?? now()->addHours(config('downloads.ttl_hours', 24));
+            $expiresAt = $taskModel->expires_at ?? now()->addHours((int) config('downloads.ttl_hours', 1));
             $response['download_url'] = URL::temporarySignedRoute('download.file', $expiresAt, ['uuid' => $taskModel->uuid]);
             $response['filename'] = $taskModel->output_filename;
             $response['size_bytes'] = $taskModel->output_size_bytes;

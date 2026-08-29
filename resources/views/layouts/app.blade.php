@@ -1,9 +1,9 @@
 @php
     $navLinks = [
         ['label' => __('Home'), 'href' => route('home')],
-        ['label' => __('Downloader'), 'href' => '#downloader'],
-        ['label' => __('Blog'), 'href' => '#'],
-        ['label' => __('About'), 'href' => '#'],
+        ['label' => __('Downloader'), 'href' => route('home').'#downloader'],
+        ['label' => __('Blog'), 'href' => route('blog')],
+        ['label' => __('About'), 'href' => route('about')],
     ];
 
     $currentLocale = app()->getLocale();
@@ -15,7 +15,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', __('Download Videos & Music From Your Favorite Platforms') . ' · DownloadIn')</title>
-    <meta name="description" content="{{ __('Download videos and audio from TikTok, Instagram, and YouTube in high quality. Fast, simple, and easy to use.') }}">
+    <meta name="description" content="@yield('meta_description', __('Save supported public videos and audio from TikTok, Instagram, and YouTube in MP4 or MP3.'))">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -142,7 +142,10 @@
                 <div>
                     <h3 class="text-sm font-semibold uppercase tracking-wider text-white">{{ __('Quick Links') }}</h3>
                     <ul class="mt-4 space-y-3 text-sm">
-                        @foreach(['About Us', 'Contact Us', 'Privacy Policy', 'Terms of Service', 'DMCA'] as $link)
+                        <li><a href="{{ route('about') }}" class="text-slate-400 transition-colors hover:text-electric-400">{{ __('About Us') }}</a></li>
+                        <li><a href="{{ route('blog') }}" class="text-slate-400 transition-colors hover:text-electric-400">{{ __('Blog') }}</a></li>
+                        <li><a href="mailto:hello@downloadin.id" class="text-slate-400 transition-colors hover:text-electric-400">{{ __('Contact Us') }}</a></li>
+                        @foreach(['Privacy Policy', 'Terms of Service', 'DMCA'] as $link)
                             <li><a href="#" class="text-slate-400 transition-colors hover:text-electric-400">{{ __($link) }}</a></li>
                         @endforeach
                     </ul>

@@ -127,15 +127,32 @@ Jika ingin memindahkan website ke Shared Hosting atau VPS Linux:
 
 ## 🧹 Pembersihan File Unduhan Otomatis (Cleanup)
 
-File media yang diunduh memiliki masa berlaku (default: 24 jam). Untuk membersihkan file yang kedaluwarsa dari penyimpanan:
+MP4 Instagram dan TikTok dialirkan langsung dari sumber melalui FFmpeg tanpa membuat file video lokal. MP3 atau media yang tidak dapat dialirkan memakai file sementara yang dihapus setelah respons selesai dikirim. File telantar memiliki masa berlaku satu jam dan diperiksa setiap 10 menit sebagai cleanup cadangan.
+
+TikTok menggunakan `yt-dlp` sebagai extractor utama dan endpoint embed resmi sebagai fallback ketika halaman utama terkena JS challenge atau browser-fingerprint blocking. Fallback mendukung analisis metadata, MP4, dan konversi MP3.
+
+Streaming dapat dinonaktifkan per platform melalui environment:
+
+```env
+TIKTOK_REMOTE_STREAMING=true
+INSTAGRAM_REMOTE_STREAMING=true
+```
+
+Untuk menjalankan cleanup secara manual:
 
 ```bash
 php artisan downloads:cleanup
 ```
 
-> **Tips di Hosting / Server**: Pasang cron job harian pada server:
+Di laptop/server lokal, jalankan scheduler bersama aplikasi:
+
+```bash
+php artisan schedule:work
+```
+
+> **Tips di Hosting / Server**: Jalankan Laravel scheduler setiap menit melalui cron:
 > ```bash
-> 0 2 * * * cd /path/to/multidownloader && php artisan downloads:cleanup >> /dev/null 2>&1
+> * * * * * cd /path/to/multidownloader && php artisan schedule:run >> /dev/null 2>&1
 > ```
 
 ---

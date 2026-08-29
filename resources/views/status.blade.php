@@ -16,7 +16,7 @@
 <script>
     window.startDownloadPolling(@json($task->uuid), {
         title: @json($task->title),
-        apiUrl: @json(route('api.tasks.show', ['task' => $task])),
+        apiUrl: @json(route('api.tasks.show', ['task' => $task->uuid])),
     });
 </script>
 @endpush

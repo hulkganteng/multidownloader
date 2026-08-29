@@ -3,16 +3,18 @@
 namespace App\Downloaders;
 
 use App\Downloaders\Contracts\DownloaderInterface;
+use App\Downloaders\Contracts\RemoteStreamDownloaderInterface;
 use App\Models\DownloadTask;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 use Throwable;
 
-abstract class YtDlpDownloader implements DownloaderInterface
+abstract class YtDlpDownloader implements DownloaderInterface, RemoteStreamDownloaderInterface
 {
     abstract protected function platform(): string;
 
@@ -90,11 +92,13 @@ abstract class YtDlpDownloader implements DownloaderInterface
 
         if (str_contains($host, 'instagram.com') || str_contains($host, 'instagr.am')) {
             $path = trim($parts['path'] ?? '', '/');
+
             return "https://www.instagram.com/{$path}/";
         }
 
         if (str_contains($host, 'tiktok.com')) {
             $path = trim($parts['path'] ?? '', '/');
+
             return "https://www.tiktok.com/{$path}";
         }
 
@@ -135,10 +139,10 @@ abstract class YtDlpDownloader implements DownloaderInterface
             );
         } elseif ($task->format === 'mp4') {
             $quality = ctype_digit((string) $task->quality) ? (int) $task->quality : null;
-            $selector = $quality
-                ? "bestvideo[height<={$quality}]+bestaudio/best[height<={$quality}]/best"
-                : 'bestvideo+bestaudio/best';
-            array_push($arguments, '--format', $selector, '--merge-output-format', 'mp4');
+            array_push($arguments, '--format', 'bestvideo+bestaudio/best', '--merge-output-format', 'mp4');
+            if ($quality) {
+                array_push($arguments, '--format-sort', "res:{$quality}");
+            }
         } else {
             array_push($arguments, '--format', 'bestvideo+bestaudio/best');
         }
@@ -171,7 +175,7 @@ abstract class YtDlpDownloader implements DownloaderInterface
             });
 
             if (! $process->isSuccessful()) {
-                throw new \Symfony\Component\Process\Exception\ProcessFailedException($process);
+                throw new ProcessFailedException($process);
             }
 
             $path = $this->findDownloadedFile($outputDirectory, $processOutput);
@@ -202,6 +206,90 @@ abstract class YtDlpDownloader implements DownloaderInterface
 
             throw new RuntimeException($detail ?? 'The source did not provide a downloadable media stream.', previous: $e);
         }
+    }
+
+    public function resolveRemoteStreams(DownloadTask $task): ?array
+    {
+        if ($task->format !== 'mp4' || ! config("downloads.{$this->platform()}.remote_streaming", false)) {
+            return null;
+        }
+
+        $this->ensureEnabled();
+        $quality = ctype_digit((string) $task->quality) ? (int) $task->quality : null;
+
+        $process = $this->createProcess([
+            ...$this->baseCommand(),
+            '--dump-single-json',
+            '--skip-download',
+            '--no-playlist',
+            '--no-warnings',
+            '--format',
+            'bestvideo+bestaudio/best',
+            ...($quality ? ['--format-sort', "res:{$quality}"] : []),
+            '--',
+            $this->cleanUrl($task->source_url),
+        ]);
+        $process->setTimeout(min(120, (int) config('downloads.process_timeout', 1800)));
+        $process->mustRun();
+
+        $metadata = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        $formats = $metadata['requested_formats'] ?? null;
+
+        if (! is_array($formats) || $formats === []) {
+            $requested = $metadata['requested_downloads'][0] ?? $metadata;
+            $formats = is_array($requested['requested_formats'] ?? null)
+                ? $requested['requested_formats']
+                : [$requested];
+        }
+
+        $streams = [];
+        $totalSize = 0;
+
+        foreach ($formats as $format) {
+            $url = $format['url'] ?? null;
+            if (! is_string($url) || ! filter_var($url, FILTER_VALIDATE_URL)) {
+                return null;
+            }
+
+            $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+            if (! in_array($scheme, ['http', 'https'], true)) {
+                return null;
+            }
+
+            $headers = [];
+            foreach (($format['http_headers'] ?? []) as $name => $value) {
+                if (is_string($name) && is_string($value) && ! str_contains($name.$value, "\r") && ! str_contains($name.$value, "\n")) {
+                    $headers[$name] = $value;
+                }
+            }
+
+            $size = (int) ($format['filesize'] ?? $format['filesize_approx'] ?? 0);
+            $totalSize += max(0, $size);
+            $streams[] = [
+                'url' => $url,
+                'headers' => $headers,
+                'vcodec' => (string) ($format['vcodec'] ?? 'none'),
+                'acodec' => (string) ($format['acodec'] ?? 'none'),
+            ];
+        }
+
+        if ($streams === [] || count($streams) > 2) {
+            return null;
+        }
+
+        $maxBytes = (int) config('downloads.max_bytes');
+        if ($totalSize > 0 && $totalSize > $maxBytes) {
+            throw new RuntimeException('The selected media exceeds the maximum allowed size.');
+        }
+
+        $safeTitle = Str::slug($task->title ?: 'media', '_') ?: 'media';
+
+        return [
+            'streams' => $streams,
+            'filename' => $safeTitle.'.mp4',
+            'mime' => 'video/mp4',
+            'size_bytes' => $totalSize > 0 ? $totalSize : null,
+        ];
     }
 
     private function estimateSize(array $metadata): ?int

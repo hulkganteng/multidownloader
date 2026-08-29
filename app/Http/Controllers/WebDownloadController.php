@@ -6,6 +6,7 @@ use App\Jobs\ProcessDownloadJob;
 use App\Models\DownloadTask;
 use App\Services\DownloadService;
 use App\Services\PlatformDetector;
+use App\Services\QueueRunner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,16 @@ class WebDownloadController extends Controller
     public function index()
     {
         return view('home');
+    }
+
+    public function blog()
+    {
+        return view('blog');
+    }
+
+    public function about()
+    {
+        return view('about');
     }
 
     public function analyze(Request $request, PlatformDetector $detector, DownloadService $service)
@@ -100,7 +111,7 @@ class WebDownloadController extends Controller
         ]);
 
         ProcessDownloadJob::dispatch($task);
-        \App\Services\QueueRunner::trigger();
+        QueueRunner::trigger();
 
         if ($request->wantsJson()) {
             return response()->json([

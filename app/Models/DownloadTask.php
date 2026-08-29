@@ -11,24 +11,47 @@ use Illuminate\Support\Str;
 class DownloadTask implements Arrayable, Jsonable
 {
     public string $uuid;
+
     public string $source_url = '';
+
     public string $platform = 'direct';
+
     public string $format = 'original';
+
     public ?string $quality = null;
+
     public ?string $bitrate = null;
+
     public string $title = 'Unknown';
+
     public ?string $thumbnail_url = null;
+
     public ?int $duration_seconds = null;
+
     public string $status = 'queued';
+
     public int $progress = 0;
+
     public ?string $error_message = null;
+
     public ?string $output_path = null;
+
     public ?string $output_filename = null;
+
     public ?int $output_size_bytes = null;
+
     public ?string $output_mime = null;
+
+    public string $delivery_method = 'file';
+
+    public array $remote_streams = [];
+
     public ?Carbon $finished_at = null;
+
     public ?Carbon $expires_at = null;
+
     public ?Carbon $created_at = null;
+
     public ?Carbon $updated_at = null;
 
     public function __construct(array $attributes = [])
@@ -120,7 +143,8 @@ class DownloadTask implements Arrayable, Jsonable
 
     public static function where(string $column, $value): object
     {
-        return new class($column, $value) {
+        return new class($column, $value)
+        {
             public function __construct(private string $column, private mixed $value) {}
 
             public function first(): ?DownloadTask
@@ -171,7 +195,17 @@ class DownloadTask implements Arrayable, Jsonable
     public static function expired(): array
     {
         return array_values(array_filter(self::allTasks(), function (DownloadTask $task) {
-            return $task->expires_at && $task->expires_at->isPast();
+            if ($task->expires_at?->isPast()) {
+                return true;
+            }
+
+            if ($task->status !== 'processing' || ! $task->updated_at) {
+                return false;
+            }
+
+            $staleAfter = (int) config('downloads.process_timeout', 1800) + 600;
+
+            return $task->updated_at->lte(now()->subSeconds($staleAfter));
         }));
     }
 
@@ -204,6 +238,8 @@ class DownloadTask implements Arrayable, Jsonable
             'output_filename' => $this->output_filename,
             'output_size_bytes' => $this->output_size_bytes,
             'output_mime' => $this->output_mime,
+            'delivery_method' => $this->delivery_method,
+            'remote_streams' => $this->remote_streams,
             'finished_at' => $this->finished_at?->toIso8601String(),
             'expires_at' => $this->expires_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),

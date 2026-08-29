@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('title', __('Download Videos & Music From Your Favorite Platforms') . ' · DownloadIn')
+@section('meta_description', __('Save supported public videos and audio from TikTok, Instagram, and YouTube in MP4 or MP3.'))
 
 @section('content')
 
@@ -18,12 +19,12 @@
             </span>
 
             <h1 class="mt-6 text-balance text-4xl font-extrabold leading-[1.1] tracking-tight text-navy-900 sm:text-5xl md:text-6xl">
-                {{ __('Download') }} <span class="gradient-text">{{ __('Videos & Music') }}</span><br class="hidden sm:block">
-                {{ __('From Your Favorite Platforms') }}
+                {{ __('Keep the media you need') }}<br class="hidden sm:block">
+                <span class="gradient-text">{{ __('ready on your device') }}</span>
             </h1>
 
             <p class="mx-auto mt-6 max-w-xl text-pretty text-base text-slate-500 sm:text-lg">
-                {{ __('Download videos and audio from TikTok, Instagram, and YouTube in high quality. Fast, simple, and easy to use.') }}
+                {{ __('Paste a public TikTok, Instagram, or YouTube link. Choose MP4 or MP3, then save the available media without creating an account.') }}
             </p>
         </div>
 
@@ -171,7 +172,7 @@
                     ['title' => __('MP3 Audio Download'), 'desc' => __('Extract and download audio easily.'), 'icon' => 'music'],
                     ['title' => __('Choose Video Quality'), 'desc' => __('Select 360p, 480p, 720p, 1080p, 2K, or 4K when available.'), 'icon' => 'settings'],
                     ['title' => __('Fast Processing'), 'desc' => __('Quick link processing and download preparation.'), 'icon' => 'bolt'],
-                    ['title' => __('Simple & Easy'), 'desc' => __('Paste the link, choose the format and quality, then download.'), 'icon' => 'sparkles'],
+                    ['title' => __('Clear Download Flow'), 'desc' => __('Paste the link, choose the available format, and save the result.'), 'icon' => 'sparkles'],
                 ];
             @endphp
             @foreach($features as $f)
@@ -204,7 +205,7 @@
     <div class="mx-auto max-w-7xl px-5 sm:px-8">
         <div class="mx-auto max-w-2xl text-center">
             <span class="text-sm font-semibold uppercase tracking-wider text-electric-600">{{ __('How It Works') }}</span>
-            <h2 class="mt-3 text-balance text-3xl font-bold tracking-tight text-navy-900 sm:text-4xl">{{ __('Download In 3 Simple Steps') }}</h2>
+            <h2 class="mt-3 text-balance text-3xl font-bold tracking-tight text-navy-900 sm:text-4xl">{{ __('Download in 3 steps') }}</h2>
         </div>
 
         <div class="relative mt-12 grid gap-10 md:grid-cols-3 md:gap-8">
@@ -234,6 +235,37 @@
                 </svg>
                 {{ __('Start Downloading') }}
             </a>
+        </div>
+    </div>
+</section>
+
+{{-- BLOG PREVIEW --}}
+<section class="bg-slate-50/70 py-20 sm:py-24">
+    <div class="mx-auto max-w-7xl px-5 sm:px-8">
+        <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div class="max-w-2xl">
+                <span class="text-sm font-semibold uppercase tracking-wider text-electric-600">{{ __('Guides') }}</span>
+                <h2 class="mt-3 text-balance text-3xl font-bold tracking-tight text-navy-900 sm:text-4xl">{{ __('Download with fewer failed links') }}</h2>
+                <p class="mt-4 text-slate-500">{{ __('Learn which links work, how formats differ, and what to check when media cannot be read.') }}</p>
+            </div>
+            <a href="{{ route('blog') }}" class="inline-flex items-center gap-2 text-sm font-semibold text-electric-600 hover:text-electric-700">
+                {{ __('Read all guides') }}
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+
+        <div class="mt-10 grid gap-6 md:grid-cols-3">
+            @foreach([
+                [__('How to download a public TikTok video'), __('Check link access, choose MP4, and save the available video to your device.')],
+                [__('MP4 or MP3: which format should you choose?'), __('Use MP4 when you need the picture and MP3 when you only need the audio.')],
+                [__('Why a media link cannot be processed'), __('Private posts, removed content, regional limits, and expired links are common causes.')],
+            ] as [$title, $summary])
+                <article class="card-surface p-7">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-electric-600">{{ __('Guide') }}</span>
+                    <h3 class="mt-3 text-lg font-semibold leading-snug text-navy-900">{{ $title }}</h3>
+                    <p class="mt-3 text-sm leading-relaxed text-slate-500">{{ $summary }}</p>
+                </article>
+            @endforeach
         </div>
     </div>
 </section>

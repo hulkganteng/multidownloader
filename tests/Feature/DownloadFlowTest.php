@@ -7,6 +7,7 @@ use App\Models\DownloadTask;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -14,10 +15,34 @@ class DownloadFlowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_download_ttl_config_is_an_integer(): void
+    {
+        $this->assertIsInt(config('downloads.ttl_hours'));
+        $this->assertSame(1, config('downloads.ttl_hours'));
+    }
+
     public function test_api_routes_are_registered(): void
     {
         $this->postJson('/api/analyze', [])->assertStatus(422);
         $this->getJson('/api/tasks/not-a-uuid')->assertStatus(404);
+    }
+
+    public function test_home_blog_and_about_pages_are_available_in_indonesian(): void
+    {
+        $this->withSession(['locale' => 'id'])
+            ->get('/')
+            ->assertOk()
+            ->assertSee('Simpan media yang Anda butuhkan');
+
+        $this->withSession(['locale' => 'id'])
+            ->get('/blog')
+            ->assertOk()
+            ->assertSee('Cara mengunduh video TikTok publik');
+
+        $this->withSession(['locale' => 'id'])
+            ->get('/tentang')
+            ->assertOk()
+            ->assertSee('Tentang DownloadIn');
     }
 
     public function test_download_api_accepts_missing_optional_fields_and_queues_job(): void
@@ -88,6 +113,65 @@ class DownloadFlowTest extends TestCase
             ->assertJsonStructure(['download_url']);
     }
 
+    public function test_remote_stream_download_does_not_create_a_local_media_file(): void
+    {
+        $task = DownloadTask::create([
+            'source_url' => 'https://www.instagram.com/reel/example/',
+            'platform' => 'instagram',
+            'format' => 'mp4',
+            'title' => 'Remote video',
+            'status' => 'finished',
+            'progress' => 100,
+            'delivery_method' => 'stream',
+            'remote_streams' => [[
+                'url' => 'https://cdn.example.com/video.mp4?signature=test',
+                'headers' => ['Referer' => 'https://www.instagram.com/'],
+                'vcodec' => 'h264',
+                'acodec' => 'aac',
+            ]],
+            'output_filename' => 'remote_video.mp4',
+            'output_mime' => 'video/mp4',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $url = URL::temporarySignedRoute('download.file', now()->addHour(), ['uuid' => $task->uuid]);
+
+        $this->get($url)->assertOk()->assertDownload('remote_video.mp4');
+
+        $this->assertSame([], File::glob(DownloadTask::storageDir($task->uuid).'/*.mp4'));
+        $this->assertSame('stream', DownloadTask::findOrFail($task->uuid)->delivery_method);
+    }
+
+    public function test_temporary_file_is_deleted_after_it_is_sent(): void
+    {
+        $task = DownloadTask::create([
+            'source_url' => 'https://example.com/video.mp4',
+            'platform' => 'direct',
+            'format' => 'original',
+            'title' => 'Temporary video',
+            'status' => 'finished',
+            'progress' => 100,
+            'output_filename' => 'temporary_video.mp4',
+            'output_mime' => 'video/mp4',
+            'expires_at' => now()->addHour(),
+        ]);
+        $path = DownloadTask::storageDir($task->uuid).'/temporary_video.mp4';
+        File::put($path, 'temporary video');
+        $url = URL::temporarySignedRoute('download.file', now()->addHour(), ['uuid' => $task->uuid]);
+
+        $response = $this->get($url);
+        $response->assertOk()->assertDownload('temporary_video.mp4');
+
+        ob_start();
+        try {
+            $response->baseResponse->sendContent();
+        } finally {
+            ob_end_clean();
+        }
+
+        $this->assertFileDoesNotExist($path);
+    }
+
     public function test_status_page_builds_the_task_api_url_behind_an_https_tunnel(): void
     {
         $task = DownloadTask::create([
@@ -139,5 +223,28 @@ class DownloadFlowTest extends TestCase
 
         $this->assertDirectoryDoesNotExist($directory);
         $this->assertNull(DownloadTask::find($uuid));
+    }
+
+    public function test_cleanup_removes_a_stalled_processing_task_but_keeps_an_active_one(): void
+    {
+        config(['downloads.process_timeout' => 1800]);
+        $stalled = DownloadTask::create([
+            'platform' => 'instagram',
+            'format' => 'mp4',
+            'status' => 'processing',
+        ]);
+        $stalled->updated_at = now()->subMinutes(41);
+        File::put(DownloadTask::metaPath($stalled->uuid), $stalled->toJson(JSON_PRETTY_PRINT));
+
+        $active = DownloadTask::create([
+            'platform' => 'instagram',
+            'format' => 'mp4',
+            'status' => 'processing',
+        ]);
+
+        $this->artisan('downloads:cleanup')->assertSuccessful();
+
+        $this->assertNull(DownloadTask::find($stalled->uuid));
+        $this->assertNotNull(DownloadTask::find($active->uuid));
     }
 }
